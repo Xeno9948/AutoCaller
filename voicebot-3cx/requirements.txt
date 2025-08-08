@@ -1,0 +1,27 @@
+# Python dependencies for the 3CX Voicebot
+# Use `pip install -r requirements.txt` to install.
+
+# Core
+sounddevice  # For audio I/O
+soundfile    # For reading/writing audio files
+numpy        # For numerical operations on audio data
+webrtcvad-wheels # For Voice Activity Detection (VAD)
+pydub        # For audio manipulation (e.g., MP3 to WAV)
+python-dotenv # For loading environment variables from .env
+pyyaml       # For parsing the config.yaml file
+tenacity     # For robust API calls with retries
+rich         # For rich terminal logging and formatting
+flask        # For the status server
+
+# AI Services
+openai       # Official OpenAI Python client
+
+# Optional dependencies (install manually if needed)
+# These are guarded in the code and not required for basic functionality.
+
+# For local STT (transcription)
+# faster-whisper
+# torch
+
+# For local TTS (text-to-speech)
+# pyttsx3

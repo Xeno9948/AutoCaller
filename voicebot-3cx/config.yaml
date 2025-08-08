@@ -1,0 +1,65 @@
+# Main configuration file for the AI Voicebot
+
+audio:
+  # Specify audio devices by name (e.g., "BlackHole 2ch") or by index (e.g., 1).
+  # Use `python scripts/list_audio_devices.py` to find the correct names/indexes.
+  input_device: "BlackHole 2ch"
+  output_device: "BlackHole 2ch"
+
+  # Standard audio parameters. 16000 Hz is required for most STT models.
+  sample_rate: 16000
+  # Block size for audio processing. A larger size means more latency but less CPU load.
+  # 1024 is a reasonable default for a 16000 Hz sample rate.
+  block_size: 1024
+  channels: 1
+
+  # Optional output gain adjustment in decibels.
+  # Can be positive or negative. Use with caution to avoid clipping or being too quiet.
+  output_gain_db: 0
+
+vad: # Voice Activity Detection settings
+  # How aggressive VAD is. 0 is the least aggressive, 3 is the most.
+  # Higher values are more sensitive to speech.
+  aggressiveness: 2
+  # Frame duration in milliseconds for VAD analysis. Must be 10, 20, or 30.
+  frame_ms: 20
+  # Minimum duration of speech in milliseconds to be considered a valid utterance.
+  min_speech_ms: 300
+  # Maximum duration of silence in milliseconds after speech before an utterance is finalized.
+  max_silence_ms: 500
+
+llm: # Large Language Model settings
+  # The model to use for generating replies.
+  model: "gpt-4o-mini"
+  # Controls randomness. Lower is more deterministic. 0.0 to 2.0.
+  temperature: 0.6
+
+stt: # Speech-to-Text settings
+  # Provider for transcription. "openai" or "local".
+  # "local" requires `faster-whisper` and `torch` to be installed.
+  provider: "openai"
+
+tts: # Text-to-Speech settings
+  # Provider for speech synthesis. "openai" or "local".
+  # "local" requires `pyttsx3` to be installed.
+  provider: "openai"
+
+openai:
+  # The STT model to use. "whisper-1" is the standard.
+  stt_model: "whisper-1"
+  # The TTS model. "tts-1" is standard, "tts-1-hd" is higher quality.
+  tts_model: "tts-1"
+  # The voice for TTS. Options: "alloy", "echo", "fable", "onyx", "nova", "shimmer"
+  voice: "onyx"
+
+persona:
+  # The industry or context for the bot's persona.
+  # Affects the system prompt. See `bot/prompts.py` for options.
+  # Options: "generic", "tourism", "ecommerce", "cleaning"
+  industry: "generic"
+  # A safety rail to keep responses concise.
+  max_reply_sentences: 2
+
+server:
+  # Port for the Flask status server.
+  port: 8765

@@ -1,0 +1,54 @@
+# pyproject.toml
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "voicebot-3cx"
+version = "0.1.0"
+description = "A real-time AI phone bot for macOS using 3CX and OpenAI."
+authors = [{ name = "Your Name", email = "you@example.com" }]
+license = { text = "MIT" }
+readme = "README.md"
+requires-python = ">=3.11"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+]
+dependencies = [
+    "sounddevice",
+    "soundfile",
+    "numpy",
+    "webrtcvad",
+    "pydub",
+    "python-dotenv",
+    "pyyaml",
+    "tenacity",
+    "rich",
+    "flask",
+    "openai",
+    # Optional dependencies, guarded in code
+    # "faster-whisper",
+    # "torch",
+    # "pyttsx3",
+]
+
+[tool.black]
+line-length = 88
+target-version = ['py311']
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+)/
+'''
