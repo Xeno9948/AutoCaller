@@ -19,6 +19,7 @@ from bot.ai_client import AIClient
 from bot.playback import PlaybackManager
 from bot.pipeline import BotPipeline
 from bot.status_server import StatusServer
+from bot.knowledge_base import KnowledgeBase
 
 log = logging.getLogger(__name__)
 
@@ -28,6 +29,7 @@ def parse_args():
     parser.add_argument("--debug", action="store_true", help="Enable debug logging, overrides LOG_LEVEL in .env.")
     parser.add_argument("--list-devices", action="store_true", help="List available audio devices and exit.")
     parser.add_argument("--dry-run", action="store_true", help="Run a synthetic loop to test AI connectivity without audio.")
+    parser.add_argument("--sales-goal", type=str, default="", help="A specific sales goal or objective for the bot to follow.")
     return parser.parse_args()
 
 def load_config(config_path: str) -> dict:
@@ -138,12 +140,22 @@ async def main():
     loop = asyncio.get_running_loop()
 
     # Initialize components
+    knowledge_base = KnowledgeBase()
     audio_in = AudioInput(config, loop)
     audio_out = AudioOutput(config)
     vad = VadSegmenter(config)
     playback_manager = PlaybackManager(config, audio_out)
     status_server = StatusServer(config)
-    pipeline = BotPipeline(config, audio_in, vad, ai_client, playback_manager, status_server)
+    pipeline = BotPipeline(
+        config=config,
+        audio_in=audio_in,
+        vad=vad,
+        ai_client=ai_client,
+        playback_manager=playback_manager,
+        status_server=status_server,
+        knowledge_base=knowledge_base,
+        sales_goal=args.sales_goal
+    )
 
     main_task = None
     try:

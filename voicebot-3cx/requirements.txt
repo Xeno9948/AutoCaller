@@ -16,6 +16,11 @@ flask        # For the status server
 # AI Services
 openai       # Official OpenAI Python client
 
+# Knowledge Base (RAG)
+langchain    # Framework for building context-aware applications
+faiss-cpu    # Vector store for local similarity search
+tiktoken     # Tokenizer used by langchain for text splitting
+
 # Optional dependencies (install manually if needed)
 # These are guarded in the code and not required for basic functionality.
 

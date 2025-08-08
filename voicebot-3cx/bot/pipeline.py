@@ -10,6 +10,7 @@ from bot.ai_client import AIClient
 from bot.playback import PlaybackManager
 from bot.prompts import get_system_prompt
 from bot.status_server import StatusServer
+from bot.knowledge_base import KnowledgeBase
 
 log = logging.getLogger(__name__)
 turn_logger = logging.getLogger("turn_logger")
@@ -26,17 +27,21 @@ class BotPipeline:
                  vad: VadSegmenter,
                  ai_client: AIClient,
                  playback_manager: PlaybackManager,
-                 status_server: StatusServer):
+                 status_server: StatusServer,
+                 knowledge_base: KnowledgeBase,
+                 sales_goal: str = ""):
         self.config = config
         self.audio_in = audio_in
         self.vad = vad
         self.ai_client = ai_client
         self.playback_manager = playback_manager
         self.status_server = status_server
+        self.knowledge_base = knowledge_base
+        self.sales_goal = sales_goal
 
         self.is_running = False
         self.conversation_history: List[Dict[str, str]] = []
-        self.system_prompt = get_system_prompt(self.config.get("persona", {}))
+        self.system_prompt = get_system_prompt(self.config.get("persona", {}), self.sales_goal)
         self.reset_history()
 
     def reset_history(self):
@@ -90,13 +95,34 @@ class BotPipeline:
             log.info(f"User said: '{asr_text}'")
             turn_data["asr_text"] = asr_text
 
-            self.conversation_history.append({"role": "user", "content": asr_text})
+            # --- RAG Integration ---
+            # 1. Query Knowledge Base for context
+            context = self.knowledge_base.query(asr_text)
 
-            # LLM
-            llm_text, llm_ms, _ = await self.ai_client.chat(self.conversation_history)
+            # 2. Prepare messages for LLM
+            messages_for_llm = self.conversation_history.copy()
+            messages_for_llm.append({"role": "user", "content": asr_text})
+
+            # 3. Inject context if found
+            if context:
+                log.info("Injecting context from knowledge base into prompt.")
+                context_prompt = (
+                    "Use the following information from your knowledge base to help answer the user's question. "
+                    "Do not mention the knowledge base directly, just use the information. "
+                    "If the context does not contain the answer, say you don't have that information.\n\n"
+                    f"<context>\n{context}\n</context>"
+                )
+                # Insert the context as a system message before the user's question
+                messages_for_llm.insert(-1, {"role": "system", "content": context_prompt})
+
+            # LLM Call
+            llm_text, llm_ms, _ = await self.ai_client.chat(messages_for_llm)
             turn_data["llm_ms"] = round(llm_ms)
             turn_data["llm_text"] = llm_text
             log.info(f"Bot reply: '{llm_text}'")
+
+            # 4. Update conversation history *after* the turn is complete
+            self.conversation_history.append({"role": "user", "content": asr_text})
             self.conversation_history.append({"role": "assistant", "content": llm_text})
 
             # TTS

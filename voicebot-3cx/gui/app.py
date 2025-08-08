@@ -1,11 +1,13 @@
 # gui/app.py
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, filedialog
 import yaml
 import os
 import subprocess
 import threading
 import queue
+
+from bot.knowledge_base import KnowledgeBase
 
 # A dictionary to define widget types and options for each config key.
 # This makes the form generation more manageable and declarative.
@@ -64,9 +66,15 @@ class Application(tk.Frame):
         self.bot_process = None
         self.log_queue = queue.Queue()
 
+        # For managing the knowledge base
+        self.knowledge_base = KnowledgeBase()
+        self.kb_file_list_path = "kb_files.txt"
+        self.kb_file_list = []
+
         self.create_widgets()
         self.load_config()
         self._process_log_queue()
+        self._load_kb_file_list()
 
     def create_widgets(self):
         self.notebook = ttk.Notebook(self)
@@ -74,14 +82,17 @@ class Application(tk.Frame):
 
         self.control_tab = ttk.Frame(self.notebook, padding="10")
         self.config_tab = ttk.Frame(self.notebook, padding="10")
+        self.knowledge_tab = ttk.Frame(self.notebook, padding="10")
         self.logs_tab = ttk.Frame(self.notebook, padding="10")
 
         self.notebook.add(self.control_tab, text="Call Control")
         self.notebook.add(self.config_tab, text="Configuration")
+        self.notebook.add(self.knowledge_tab, text="Knowledge & Goals")
         self.notebook.add(self.logs_tab, text="Logs")
 
         self.create_control_tab_content()
         self.create_config_tab_content()
+        self.create_knowledge_tab_content()
         self.create_logs_tab_content()
 
     def create_control_tab_content(self):
@@ -303,8 +314,11 @@ class Application(tk.Frame):
         self.status_var.set(f"Status: Calling {phone_number}...")
         self.notebook.select(self.logs_tab) # Switch to logs tab
 
+        # Get sales goal from the text widget
+        sales_goal = self.goal_text.get("1.0", tk.END).strip()
+
         # Run the bot script in a separate thread
-        thread = threading.Thread(target=self._run_bot_process, args=(phone_number,), daemon=True)
+        thread = threading.Thread(target=self._run_bot_process, args=(phone_number, sales_goal), daemon=True)
         thread.start()
 
     def stop_call(self):
@@ -319,7 +333,7 @@ class Application(tk.Frame):
         self.stop_button.config(state=tk.DISABLED)
         self.status_var.set("Status: Idle")
 
-    def _run_bot_process(self, phone_number):
+    def _run_bot_process(self, phone_number, sales_goal):
         """This method runs in a background thread."""
         script_path = "mac/call_with_bot.sh"
         if not os.path.exists(script_path):
@@ -329,6 +343,9 @@ class Application(tk.Frame):
 
         try:
             command = [script_path, phone_number]
+            if sales_goal and sales_goal.strip():
+                command.append(sales_goal)
+
             self.bot_process = subprocess.Popen(
                 command,
                 stdout=subprocess.PIPE,
@@ -362,6 +379,156 @@ class Application(tk.Frame):
                     self.stop_button.config(state=tk.DISABLED)
                     self.status_var.set("Status: Finished")
                 else:
+                    self.log_viewer.config(state='normal')
+                    self.log_viewer.insert(tk.END, message)
+                    self.log_viewer.see(tk.END)
+                    self.log_viewer.config(state='disabled')
+        finally:
+            self.master.after(100, self._process_log_queue)
+
+
+    def create_knowledge_tab_content(self):
+        """Creates the content for the Knowledge & Goals tab."""
+        main_frame = ttk.Frame(self.knowledge_tab)
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        main_frame.rowconfigure(1, weight=1)
+        main_frame.columnconfigure(0, weight=1)
+
+        # --- Sales Goal Section ---
+        goal_frame = ttk.LabelFrame(main_frame, text="Call Objective", padding="10")
+        goal_frame.grid(row=0, column=0, padx=10, pady=5, sticky="ew")
+        goal_frame.columnconfigure(0, weight=1)
+
+        self.goal_text = tk.Text(goal_frame, height=3, wrap=tk.WORD)
+        self.goal_text.pack(fill=tk.X, expand=True)
+        self.goal_text.insert("1.0", "The primary goal is to book a demo for our new software product.")
+
+        # --- Knowledge Base Section ---
+        kb_frame = ttk.LabelFrame(main_frame, text="Knowledge Base Source Files", padding="10")
+        kb_frame.grid(row=1, column=0, padx=10, pady=5, sticky="nsew")
+        kb_frame.rowconfigure(0, weight=1)
+        kb_frame.columnconfigure(0, weight=1)
+
+        list_frame = ttk.Frame(kb_frame)
+        list_frame.grid(row=0, column=0, columnspan=3, sticky="nsew", pady=5)
+        list_frame.rowconfigure(0, weight=1)
+        list_frame.columnconfigure(0, weight=1)
+
+        self.kb_listbox = tk.Listbox(list_frame, selectmode=tk.EXTENDED)
+        self.kb_listbox.grid(row=0, column=0, sticky="nsew")
+
+        scrollbar = ttk.Scrollbar(list_frame, orient="vertical", command=self.kb_listbox.yview)
+        scrollbar.grid(row=0, column=1, sticky="ns")
+        self.kb_listbox.config(yscrollcommand=scrollbar.set)
+
+        button_frame = ttk.Frame(kb_frame)
+        button_frame.grid(row=1, column=0, columnspan=3, sticky="ew", pady=5)
+
+        add_button = ttk.Button(button_frame, text="Add Files...", command=self._add_kb_files)
+        add_button.pack(side=tk.LEFT, padx=5)
+
+        remove_button = ttk.Button(button_frame, text="Remove Selected", command=self._remove_selected_kb_files)
+        remove_button.pack(side=tk.LEFT, padx=5)
+
+        self.rebuild_button = ttk.Button(button_frame, text="Save and Rebuild Index", command=self._rebuild_knowledge_base)
+        self.rebuild_button.pack(side=tk.RIGHT, padx=5)
+
+        self.kb_status_var = tk.StringVar(value="Status: Idle")
+        status_label = ttk.Label(kb_frame, textvariable=self.kb_status_var)
+        status_label.grid(row=2, column=0, columnspan=3, sticky="w", padx=5, pady=5)
+
+    def _add_kb_files(self):
+        file_paths = filedialog.askopenfilenames(
+            title="Select Knowledge Base Files",
+            filetypes=(("Text files", "*.txt"), ("All files", "*.*"))
+        )
+        if not file_paths:
+            return
+
+        for path in file_paths:
+            if path not in self.kb_listbox.get(0, tk.END):
+                self.kb_listbox.insert(tk.END, path)
+
+        self._save_kb_file_list()
+
+    def _remove_selected_kb_files(self):
+        selected_indices = self.kb_listbox.curselection()
+        # Iterate backwards to avoid index shifting issues
+        for i in sorted(selected_indices, reverse=True):
+            self.kb_listbox.delete(i)
+        self._save_kb_file_list()
+
+    def _rebuild_knowledge_base(self):
+        self.rebuild_button.config(state=tk.DISABLED)
+        self.kb_status_var.set("Status: Rebuilding index...")
+
+        files_to_index = self.kb_listbox.get(0, tk.END)
+        if not files_to_index:
+            messagebox.showwarning("Warning", "No files in the knowledge base to index.")
+            self.kb_status_var.set("Status: Idle")
+            self.rebuild_button.config(state=tk.NORMAL)
+            return
+
+        thread = threading.Thread(target=self._rebuild_kb_worker, args=(files_to_index,), daemon=True)
+        thread.start()
+
+    def _rebuild_kb_worker(self, file_paths):
+        """Runs in a background thread to avoid freezing the GUI."""
+        try:
+            self.log_queue.put("--- Clearing and rebuilding knowledge base ---\n")
+            self.knowledge_base.clear()
+            self.knowledge_base.build_from_files(file_paths)
+            self.log_queue.put("--- Knowledge base rebuild complete ---\n")
+            self.log_queue.put({"type": "kb_status", "message": "Status: Ready"})
+        except Exception as e:
+            error_message = f"--- ERROR rebuilding knowledge base: {e} ---\n"
+            self.log_queue.put(error_message)
+            self.log_queue.put({"type": "kb_status", "message": f"Status: Error"})
+        finally:
+            self.log_queue.put({"type": "rebuild_done"})
+
+    def _load_kb_file_list(self):
+        try:
+            if os.path.exists(self.kb_file_list_path):
+                with open(self.kb_file_list_path, 'r', encoding='utf-8') as f:
+                    self.kb_file_list = [line.strip() for line in f if line.strip()]
+
+                self.kb_listbox.delete(0, tk.END)
+                for file_path in self.kb_file_list:
+                    self.kb_listbox.insert(tk.END, file_path)
+
+            if self.knowledge_base.exists():
+                self.kb_status_var.set("Status: Ready (Loaded from disk)")
+            else:
+                 self.kb_status_var.set("Status: Index not found. Please build.")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to load knowledge base file list: {e}")
+
+    def _save_kb_file_list(self):
+        try:
+            with open(self.kb_file_list_path, 'w', encoding='utf-8') as f:
+                for item in self.kb_listbox.get(0, tk.END):
+                    f.write(f"{item}\n")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to save knowledge base file list: {e}")
+
+    def _process_log_queue(self):
+        """Checks the queue for log messages and updates the GUI."""
+        try:
+            while not self.log_queue.empty():
+                message = self.log_queue.get_nowait()
+
+                if isinstance(message, dict):
+                    # Handle structured messages
+                    if message.get("type") == "kb_status":
+                        self.kb_status_var.set(message.get("message", "Status: Unknown"))
+                    elif message.get("type") == "rebuild_done":
+                        self.rebuild_button.config(state=tk.NORMAL)
+                elif message is None: # Sentinel value to reset UI
+                    self.start_button.config(state=tk.NORMAL)
+                    self.stop_button.config(state=tk.DISABLED)
+                    self.status_var.set("Status: Finished")
+                else: # It's a string log message
                     self.log_viewer.config(state='normal')
                     self.log_viewer.insert(tk.END, message)
                     self.log_viewer.see(tk.END)

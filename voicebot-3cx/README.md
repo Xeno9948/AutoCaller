@@ -60,53 +60,48 @@ You need to provide your OpenAI API key for the bot to work.
   LOG_LEVEL=DEBUG # Optional: Keep DEBUG for verbose logs
   ```
 
-### 5. Configure the Bot
+### 5. Launch the Control Panel
 
-The `config.yaml` file controls the bot's behavior. You need to tell it which audio devices to use.
+The primary way to use the bot is through the GUI Control Panel.
 
-- First, find the name or index of your BlackHole device:
+- Activate the virtual environment:
   ```bash
-  python scripts/list_audio_devices.py
+  source .venv/bin/activate
   ```
-- Look for `BlackHole 2ch` in the output. Note its name or index number.
-- Open `config.yaml` and update the `audio` section. It should look like this:
-  ```yaml
-  audio:
-    input_device: "BlackHole 2ch"
-    output_device: "BlackHole 2ch"
-    # ... other settings
-  ```
-  You can use the device name (string) or its index (integer).
-
-### 6. Run Sanity Checks (Recommended)
-
-Before making a live call, run these helper scripts to ensure everything is configured correctly.
-
-- **Test Text-to-Speech (TTS):**
+- Run the GUI application:
   ```bash
-  python scripts/sanity_tts_test.py
+  python run_gui.py
   ```
-  You should hear a test sentence played through your default speakers.
 
-- **Test Audio Input:**
+### 6. Configure and Place a Call
+
+Once the GUI is running, you can manage the bot easily:
+
+1.  **Configure:** Go to the **Configuration** tab. All settings from `config.yaml` are displayed here. Make any adjustments you need (e.g., select the correct audio devices, change the bot's persona) and click **"Save Configuration"**.
+2.  **Place Call:** Go to the **Call Control** tab. Enter the E.164 formatted phone number you wish to call and click **"Start Call"**.
+3.  **Monitor:** The application will automatically switch to the **Logs** tab, where you can see the live output from the bot.
+4.  **End Call:** When the call is finished, click the **"Stop Call"** button. The script will hang up and restore your original audio settings.
+
+## Advanced Usage (Command Line)
+
+For developers or for automation, you can still run the bot directly from the command line.
+
+- **Activate the virtual environment:**
   ```bash
-  python scripts/sanity_input_monitor.py
+  source .venv/bin/activate
   ```
-  This will record 5 seconds of audio from the configured input device (`BlackHole 2ch`) and save it to `tmp/monitor.wav`.
-
-### 7. Place a Call with the Bot!
-
-You are now ready to run the full orchestration script.
-
-- Provide an E.164 formatted phone number as an argument:
+- **Run the orchestration script:**
   ```bash
   ./mac/call_with_bot.sh +15551234567
   ```
-- The script will:
-  1. Switch your system audio to BlackHole.
-  2. Open the 3CX app and dial the number.
-  3. Start the Python bot, which will take over the call.
-- To end the call, press **`Ctrl+C`** in the terminal. The script will automatically restore your original audio devices.
+- To end the call, press **`Ctrl+C`** in the terminal.
+
+### Sanity Checks
+
+It's still a good idea to run these checks if you encounter issues:
+
+- **Test Text-to-Speech (TTS):** `python scripts/sanity_tts_test.py`
+- **Test Audio Input:** `python scripts/sanity_input_monitor.py`
 
 ## Troubleshooting
 

@@ -42,10 +42,11 @@ log_error() {
 # --- Argument Check ---
 if [ -z "$1" ]; then
     log_error "No phone number provided."
-    echo "Usage: $0 <E.164_phone_number>"
+    echo "Usage: $0 <E.164_phone_number> [\"Optional sales goal in quotes\"]"
     exit 1
 fi
 PHONE_NUMBER=$1
+SALES_GOAL=$2 # This will be the second argument
 
 # --- Cleanup Function ---
 # This function is called on script exit to restore audio devices.
@@ -109,7 +110,13 @@ source "$VENV_PATH/bin/activate"
 log "Starting the Python AI bot... (Press Ctrl+C to end the call)"
 # The bot script will run here until it exits or is interrupted.
 # The `trap` will handle cleanup automatically.
-python -m "$BOT_MAIN_MODULE"
+if [ -n "$SALES_GOAL" ]; then
+    log "  - With sales goal: '$SALES_GOAL'"
+    python -m "$BOT_MAIN_MODULE" --sales-goal "$SALES_GOAL"
+else
+    log "  - No sales goal provided."
+    python -m "$BOT_MAIN_MODULE"
+fi
 
 log "Bot script finished. Orchestration complete."
 exit 0

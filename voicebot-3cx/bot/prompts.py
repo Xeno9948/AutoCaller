@@ -27,9 +27,9 @@ PERSONA_PROMPTS = {
 
 # --- Prompt Generation ---
 
-def get_system_prompt(config: Dict[str, Any]) -> List[Dict[str, str]]:
+def get_system_prompt(config: Dict[str, Any], goal: str = None) -> List[Dict[str, str]]:
     """
-    Generates the system prompt message list based on the persona config.
+    Generates the system prompt message list based on the persona config and an optional goal.
     This defines the bot's behavior, personality, and constraints.
     """
     persona_config = config.get("persona", {})
@@ -60,6 +60,12 @@ def get_system_prompt(config: Dict[str, Any]) -> List[Dict[str, str]]:
         "**Your Conversation Rules:**\n"
         f"- {'\n- '.join(constraints)}"
     )
+
+    if goal and goal.strip():
+        full_system_prompt += (
+            f"\n\n**Primary Objective For This Call:**\n"
+            f"{goal.strip()}"
+        )
 
     messages = [
         {
